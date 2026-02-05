@@ -7,7 +7,7 @@ import os
 from typing import List, Optional, Tuple
 
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain_community.document_loaders.base import BaseLoader  
+from langchain_community.document_loaders.base import BaseLoader
 from langchain_core.documents import Document
 
 from utils.logger_handler import get_logger
@@ -51,17 +51,17 @@ def get_file_md5_hex(file_path: str) -> Optional[str]:
 
 
 def listdir_with_allowed_type(
-    dir_path: str, allowed_types: Tuple[str, ...]
-) -> Tuple[str, ...]:
+    dir_path: str, allowed_types: Tuple[str]
+) -> Tuple[str]:
     """
     列出目录下所有指定类型的文件。
 
     Args:
         dir_path (str): 目录路径。
-        allowed_types (Tuple[str, ...]): 允许的文件类型元组，例如 (".txt", ".md")。
+        allowed_types (Tuple[str]): 允许的文件类型元组，例如 (".txt", ".md")。
 
     Returns:
-        Tuple[str, ...]: 目录下所有指定类型的文件元组。
+        Tuple[str]: 目录下所有指定类型的文件元组。
     """
     if not os.path.exists(dir_path):
         logger.error(f"[listdir_with_allowed_type]: 目录 {dir_path} 不存在")
@@ -74,7 +74,8 @@ def listdir_with_allowed_type(
     try:
         for f in os.listdir(dir_path):
             if f.endswith(allowed_types):
-                files.append(f)
+                # 确保文件路径是绝对路径
+                files.append(os.path.join(dir_path, f))
         return tuple(files)
     except Exception as e:
         logger.error(

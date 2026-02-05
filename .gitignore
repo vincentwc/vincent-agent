@@ -50,3 +50,12 @@ Thumbs.db
 test_utils_temp.py
 logs/
 *.log
+
+# Vector Database
+chroma_db/
+
+# Data & Knowledge Base
+data/
+md5.txt
+md5_store.txt
+

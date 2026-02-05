@@ -32,7 +32,7 @@ def load_rag_prompts() -> str:
     """
     加载RAG默认提示词[字符串]
     Returns:
-        dict: RAG提示词
+        str: RAG提示词
     """
     # 从配置文件中加载RAG提示词
     try:
@@ -55,7 +55,7 @@ def load_report_prompts() -> str:
     """
     加载RAG报告提示词[字符串]
     Returns:
-        dict: RAG报告提示词
+        str: RAG报告提示词  
     """
     # 从配置文件中加载RAG报告提示词
     try:

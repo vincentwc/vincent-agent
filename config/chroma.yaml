@@ -1,0 +1,12 @@
+collection_name: vincent-agent
+persist_directory: chroma_db
+
+chunk_size: 1000
+chunk_overlap: 100
+k: 3
+separators: ["\n\n", "\n", " ", ".", "?", "!", ",", "，", "！", "？"," "]
+
+md5_hex_store: md5.txt
+
+data_path: data
+allowed_file_type: ["pdf", "txt"]
