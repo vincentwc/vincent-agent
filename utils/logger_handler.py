@@ -2,12 +2,11 @@
 日志处理工具类
 """
 
-import os
 import logging
+import os
 from datetime import datetime
 
 from utils.path_tool import get_abs_path
-
 
 # 日志保存的根目录
 LOG_ROOT_DIR = get_abs_path("logs")
@@ -22,7 +21,7 @@ DEFAULT_LOG_FORMAT = logging.Formatter(
 
 
 def get_logger(
-    logger_name: str = "agent",
+    logger_name: str,
     log_file: str = None,
     console_log_level: int = logging.INFO,
     print_console_log: bool = True,
@@ -67,11 +66,13 @@ def get_logger(
     return logger
 
 
-if __name__ == "__main__":
-    logger = get_logger()
-    logger.debug("这是一条debug日志")
-    logger.info("这是一条info日志")
-    logger.warning("这是一条warning日志")
-    logger.error("这是一条error日志")
-    logger.critical("这是一条critical日志")
-    print(get_abs_path(__name__))
+
+
+# if __name__ == "__main__":
+#     logger = get_logger()
+#     logger.debug("这是一条debug日志")
+#     logger.info("这是一条info日志")
+#     logger.warning("这是一条warning日志")
+#     logger.error("这是一条error日志")
+#     logger.critical("这是一条critical日志")
+#     print(get_abs_path(__name__))
