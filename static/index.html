@@ -3,153 +3,306 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vincent Agent - 文档上传</title>
+    <title>Vincent Agent - 知识库管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f7;
-        }
-        .container {
-            background-color: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #1d1d1f;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .upload-area {
-            border: 2px dashed #007aff;
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .upload-area:hover {
-            background-color: #f0f8ff;
-        }
-        #fileInput {
-            display: none;
-        }
-        .btn {
-            background-color: #007aff;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 20px;
-        }
-        .btn:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        #status {
-            margin-top: 20px;
-            padding: 10px;
-            border-radius: 6px;
-            display: none;
-        }
-        .success {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-        }
-        .error {
-            background-color: #ffebee;
-            color: #c62828;
-        }
-        .file-info {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #666;
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>📚 Vincent Agent 文档中心</h1>
-        
-        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-            <p>点击选择或拖拽文件到此处</p>
-            <input type="file" id="fileInput" onchange="handleFileSelect(this)">
-            <div id="fileName" class="file-info"></div>
+<body class="bg-gray-50 text-gray-800 h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-brain text-blue-600 text-2xl"></i>
+                <h1 class="text-xl font-bold text-gray-900">Vincent Agent 知识库</h1>
+            </div>
+            <button onclick="openCreateModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i> 新建知识库
+            </button>
         </div>
-        
-        <div style="text-align: center;">
-            <button id="uploadBtn" class="btn" onclick="uploadFile()" disabled>开始上传</button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6">
+        <div class="max-w-7xl mx-auto">
+            
+            <!-- Loading State -->
+            <div id="loading" class="text-center py-20 hidden">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500"></i>
+                <p class="mt-4 text-gray-500">加载中...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center py-20 hidden">
+                <div class="bg-white p-8 rounded-2xl shadow-sm inline-block max-w-md">
+                    <i class="fa-regular fa-folder-open text-6xl text-gray-300 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900">暂无知识库</h3>
+                    <p class="text-gray-500 mt-2 mb-6">创建一个新的知识库来开始管理您的文档资产。</p>
+                    <button onclick="openCreateModal()" class="text-blue-600 hover:text-blue-700 font-medium">立即创建 &rarr;</button>
+                </div>
+            </div>
+
+            <!-- KB Grid -->
+            <div id="kbGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- KB Cards will be injected here -->
+            </div>
         </div>
-        
-        <div id="status"></div>
+    </main>
+
+    <!-- Create/Edit Modal -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all scale-100">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="modalTitle" class="text-xl font-bold text-gray-900">新建知识库</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="kbForm" onsubmit="handleSubmit(event)">
+                <input type="hidden" id="kbId" name="kbId">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">名称</label>
+                    <input type="text" id="nameInput" name="name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="例如：产品文档">
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">描述 (可选)</label>
+                    <textarea id="descInput" name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="简要描述该知识库的内容用途..."></textarea>
+                </div>
+
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2">
+                        <span id="submitBtnText">创建</span>
+                        <i id="submitBtnSpinner" class="fa-solid fa-circle-notch fa-spin hidden"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <i id="toastIcon" class="fa-solid fa-check-circle text-green-400"></i>
+            <span id="toastMessage">操作成功</span>
+        </div>
     </div>
 
     <script>
-        function handleFileSelect(input) {
-            const fileName = input.files[0]?.name;
-            const fileNameDiv = document.getElementById('fileName');
-            const uploadBtn = document.getElementById('uploadBtn');
-            
-            if (fileName) {
-                fileNameDiv.textContent = `已选择: ${fileName}`;
-                uploadBtn.disabled = false;
-            } else {
-                fileNameDiv.textContent = '';
-                uploadBtn.disabled = true;
+        const API_BASE = window.location.origin;
+        const TENANT_ID = "default_tenant"; // 暂时硬编码
+        let currentKBs = []; // Store KBs for easy access
+
+        // Load KBs on start
+        document.addEventListener('DOMContentLoaded', fetchKBs);
+
+        async function fetchKBs() {
+            showLoading(true);
+            try {
+                const res = await fetch(`${API_BASE}/kb/list?tenant_id=${TENANT_ID}`);
+                const data = await res.json();
+                currentKBs = data;
+                renderKBs(data);
+            } catch (error) {
+                showToast('加载失败: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
             }
         }
 
-        async function uploadFile() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            const statusDiv = document.getElementById('status');
-            const uploadBtn = document.getElementById('uploadBtn');
+        function renderKBs(kbs) {
+            const grid = document.getElementById('kbGrid');
+            const empty = document.getElementById('emptyState');
+            
+            grid.innerHTML = '';
+            
+            if (kbs.length === 0) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
+                return;
+            }
+            
+            empty.classList.add('hidden');
+            grid.classList.remove('hidden');
 
-            if (!file) return;
+            kbs.forEach(kb => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative group';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="bg-blue-100 text-blue-600 w-10 h-10 rounded-lg flex items-center justify-center">
+                            <i class="fa-solid fa-book"></i>
+                        </div>
+                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="openEditModal('${kb.id}')" class="text-gray-400 hover:text-blue-500 p-1.5 rounded-md hover:bg-blue-50 transition-colors" title="编辑">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deleteKB('${kb.id}')" class="text-gray-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition-colors" title="删除">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-2 truncate">${escapeHtml(kb.name)}</h3>
+                    <p class="text-gray-500 text-sm mb-4 line-clamp-2 h-10">${escapeHtml(kb.description || '暂无描述')}</p>
+                    <div class="flex items-center justify-between text-xs text-gray-400 pt-4 border-t border-gray-50">
+                        <span><i class="fa-regular fa-clock mr-1"></i>${formatDate(kb.created_at)}</span>
+                        <span class="bg-gray-100 px-2 py-1 rounded text-gray-500">ID: ${kb.id.slice(0,8)}...</span>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
 
-            // 准备上传
-            uploadBtn.disabled = true;
-            uploadBtn.textContent = '上传中...';
-            statusDiv.style.display = 'none';
+        async function handleSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            const btn = form.querySelector('button[type="submit"]');
+            const spinner = document.getElementById('submitBtnSpinner');
+            const btnText = document.getElementById('submitBtnText');
+            const kbId = document.getElementById('kbId').value;
+            const isEdit = !!kbId;
 
-            const formData = new FormData();
-            formData.append('file', file);
+            // Loading state
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            btnText.textContent = isEdit ? '保存中...' : '创建中...';
+
+            const payload = {
+                name: form.name.value,
+                description: form.description.value,
+                tenant_id: TENANT_ID
+            };
 
             try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+                let url = `${API_BASE}/kb/create`;
+                let method = 'POST';
 
-                const result = await response.json();
-
-                statusDiv.style.display = 'block';
-                if (response.ok) {
-                    statusDiv.className = 'success';
-                    statusDiv.textContent = `✅ ${result.message}`;
-                    // 清理
-                    fileInput.value = '';
-                    document.getElementById('fileName').textContent = '';
-                    setTimeout(() => {
-                        uploadBtn.textContent = '开始上传';
-                        // 保持按钮禁用，直到选择新文件
-                    }, 2000);
-                } else {
-                    throw new Error(result.detail || '上传失败');
+                if (isEdit) {
+                    url = `${API_BASE}/kb/${kbId}?tenant_id=${TENANT_ID}`;
+                    method = 'PUT';
                 }
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) throw new Error(isEdit ? '更新失败' : '创建失败');
+                
+                showToast(isEdit ? '知识库已更新' : '知识库创建成功');
+                closeModal();
+                fetchKBs(); // Reload list
             } catch (error) {
-                statusDiv.style.display = 'block';
-                statusDiv.className = 'error';
-                statusDiv.textContent = `❌ ${error.message}`;
-                uploadBtn.disabled = false;
-                uploadBtn.textContent = '开始上传';
+                showToast(error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+                btnText.textContent = isEdit ? '保存' : '创建';
             }
         }
+
+        async function deleteKB(id) {
+            if (!confirm('确定要删除这个知识库吗？此操作无法撤销。')) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/kb/${id}?tenant_id=${TENANT_ID}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!res.ok) throw new Error('删除失败');
+                
+                showToast('知识库已删除');
+                fetchKBs();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // --- UI Helpers ---
+
+        function openCreateModal() {
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = '新建知识库';
+            document.getElementById('submitBtnText').textContent = '创建';
+            document.getElementById('kbForm').reset();
+            document.getElementById('kbId').value = '';
+        }
+
+        function openEditModal(id) {
+            const kb = currentKBs.find(k => k.id === id);
+            if (!kb) return;
+
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = '编辑知识库';
+            document.getElementById('submitBtnText').textContent = '保存';
+            
+            document.getElementById('kbId').value = kb.id;
+            document.getElementById('nameInput').value = kb.name;
+            document.getElementById('descInput').value = kb.description || '';
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        function showLoading(show) {
+            const el = document.getElementById('loading');
+            if (show) {
+                el.classList.remove('hidden');
+                document.getElementById('kbGrid').classList.add('hidden');
+                document.getElementById('emptyState').classList.add('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const text = document.getElementById('toastMessage');
+            
+            text.textContent = msg;
+            icon.className = type === 'success' 
+                ? 'fa-solid fa-check-circle text-green-400' 
+                : 'fa-solid fa-circle-exclamation text-red-400';
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(isoString) {
+            return new Date(isoString).toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Close modal on outside click
+        document.getElementById('modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('modal')) closeModal();
+        });
     </script>
 </body>
 </html>

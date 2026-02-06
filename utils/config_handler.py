@@ -20,8 +20,8 @@ class Config:
 
     _instance = None
 
-    def __new__(cls): 
-        if cls._instance is None: 
+    def __new__(cls):
+        if cls._instance is None:
             cls._instance = super(Config, cls).__new__(cls)
             cls._instance._initialize()
         return cls._instance
@@ -32,6 +32,7 @@ class Config:
         self._chroma = None
         self._agent = None
         self._prompts = None
+        self._database = None
 
     def _load_yaml(self, filename: str) -> dict:
         """通用 YAML 加载函数"""
@@ -71,6 +72,12 @@ class Config:
             self._prompts = self._load_yaml("prompts.yaml")
         return self._prompts
 
+    @property
+    def database(self) -> dict:
+        if self._database is None:
+            self._database = self._load_yaml("database.yaml")
+        return self._database
+
 
 # 全局单例对象
 config = Config()
@@ -85,5 +92,3 @@ config = Config()
 #     a = Config()
 #     b = Config()
 #     print(a is b)
-    
-    
