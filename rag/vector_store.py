@@ -150,9 +150,9 @@ class VectoreStoreService:
 
         # 使用线程池并发处理文件
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            executor.map(self._process_single_file, allowed_files)
+            executor.map(self.process_file, allowed_files)
 
-    def _process_single_file(self, file_path: str):
+    def process_file(self, file_path: str):
         """
         处理单个文件：计算MD5 -> 检查重复 -> 加载 -> 分块 -> 存储。
         """

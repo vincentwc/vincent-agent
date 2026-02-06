@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vincent Agent - 文档上传</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f7;
+        }
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1d1d1f;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 2px dashed #007aff;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .upload-area:hover {
+            background-color: #f0f8ff;
+        }
+        #fileInput {
+            display: none;
+        }
+        .btn {
+            background-color: #007aff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .file-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 Vincent Agent 文档中心</h1>
+        
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <p>点击选择或拖拽文件到此处</p>
+            <input type="file" id="fileInput" onchange="handleFileSelect(this)">
+            <div id="fileName" class="file-info"></div>
+        </div>
+        
+        <div style="text-align: center;">
+            <button id="uploadBtn" class="btn" onclick="uploadFile()" disabled>开始上传</button>
+        </div>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function handleFileSelect(input) {
+            const fileName = input.files[0]?.name;
+            const fileNameDiv = document.getElementById('fileName');
+            const uploadBtn = document.getElementById('uploadBtn');
+            
+            if (fileName) {
+                fileNameDiv.textContent = `已选择: ${fileName}`;
+                uploadBtn.disabled = false;
+            } else {
+                fileNameDiv.textContent = '';
+                uploadBtn.disabled = true;
+            }
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const statusDiv = document.getElementById('status');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            if (!file) return;
+
+            // 准备上传
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '上传中...';
+            statusDiv.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                statusDiv.style.display = 'block';
+                if (response.ok) {
+                    statusDiv.className = 'success';
+                    statusDiv.textContent = `✅ ${result.message}`;
+                    // 清理
+                    fileInput.value = '';
+                    document.getElementById('fileName').textContent = '';
+                    setTimeout(() => {
+                        uploadBtn.textContent = '开始上传';
+                        // 保持按钮禁用，直到选择新文件
+                    }, 2000);
+                } else {
+                    throw new Error(result.detail || '上传失败');
+                }
+            } catch (error) {
+                statusDiv.style.display = 'block';
+                statusDiv.className = 'error';
+                statusDiv.textContent = `❌ ${error.message}`;
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '开始上传';
+            }
+        }
+    </script>
+</body>
+</html>
