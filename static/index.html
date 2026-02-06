@@ -142,7 +142,10 @@
                         <div class="bg-blue-100 text-blue-600 w-10 h-10 rounded-lg flex items-center justify-center">
                             <i class="fa-solid fa-book"></i>
                         </div>
-                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="openDocModal('${kb.id}', '${escapeHtml(kb.name)}')" class="text-gray-400 hover:text-indigo-600 p-1.5 rounded-md hover:bg-indigo-50 transition-colors" title="管理文档">
+                                <i class="fa-solid fa-folder-open"></i>
+                            </button>
                             <button onclick="openEditModal('${kb.id}')" class="text-gray-400 hover:text-blue-500 p-1.5 rounded-md hover:bg-blue-50 transition-colors" title="编辑">
                                 <i class="fa-solid fa-pen"></i>
                             </button>
@@ -303,6 +306,106 @@
         document.getElementById('modal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('modal')) closeModal();
         });
+
+        // --- Document management ---
+        function openDocModal(kbId, kbName) {
+            const modal = document.createElement('div');
+            modal.id = 'docModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-gray-900">管理文档 · ${kbName}</h3>
+                        <button onclick="closeDocModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="mb-4 text-sm text-gray-500">
+                        允许上传的类型: .html, .xlsx, .docx, .xls, .md, .pdf, .markdown, .csv, .txt
+                    </div>
+                    <div class="flex items-center gap-3 mb-6">
+                        <input id="docFileInput" type="file" accept=".html,.xlsx,.docx,.xls,.md,.pdf,.markdown,.csv,.txt" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <button onclick="uploadDoc('${kbId}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">上传</button>
+                    </div>
+                    <div id="docList" class="space-y-2">
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            fetchDocs(kbId);
+        }
+
+        function closeDocModal() {
+            const m = document.getElementById('docModal');
+            if (m) m.remove();
+        }
+
+        async function fetchDocs(kbId) {
+            const listEl = document.getElementById('docList');
+            listEl.innerHTML = '<div class="text-gray-400 text-sm">加载中...</div>';
+            try {
+                const res = await fetch(`${API_BASE}/kb/${kbId}/files`);
+                const docs = await res.json();
+                if (docs.length === 0) {
+                    listEl.innerHTML = '<div class="text-gray-400 text-sm">暂无文档</div>';
+                    return;
+                }
+                listEl.innerHTML = '';
+                docs.forEach(d => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg';
+                    row.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <i class="fa-regular fa-file-lines text-gray-500"></i>
+                            <a href="${API_BASE}/kb/${d.kb_id}/files/${d.id}/download" class="text-blue-600 hover:text-blue-700 font-medium" target="_blank">${escapeHtml(d.filename)}</a>
+                            <span class="text-xs text-gray-400">(${(d.size/1024).toFixed(1)} KB)</span>
+                        </div>
+                        <button onclick="deleteDoc('${d.kb_id}', '${d.id}')" class="text-gray-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition-colors" title="删除">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    `;
+                    listEl.appendChild(row);
+                });
+            } catch (e) {
+                listEl.innerHTML = '<div class="text-red-500 text-sm">加载失败</div>';
+            }
+        }
+
+        async function uploadDoc(kbId) {
+            const input = document.getElementById('docFileInput');
+            if (!input.files || !input.files[0]) {
+                showToast('请选择文件', 'error');
+                return;
+            }
+            const filename = input.files[0].name.toLowerCase();
+            const allowed = ['.html','.xlsx','.docx','.xls','.md','.pdf','.markdown','.csv','.txt'];
+            if (!allowed.some(ext => filename.endsWith(ext))) {
+                showToast('不支持的文件类型', 'error');
+                return;
+            }
+            const fd = new FormData();
+            fd.append('file', input.files[0]);
+            try {
+                const res = await fetch(`${API_BASE}/kb/${kbId}/files/upload`, { method: 'POST', body: fd });
+                if (!res.ok) throw new Error('上传失败');
+                showToast('上传成功');
+                fetchDocs(kbId);
+                input.value = '';
+            } catch (e) {
+                showToast('上传失败', 'error');
+            }
+        }
+
+        async function deleteDoc(kbId, docId) {
+            try {
+                const res = await fetch(`${API_BASE}/kb/${kbId}/files/${docId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('删除失败');
+                showToast('已删除');
+                fetchDocs(kbId);
+            } catch (e) {
+                showToast('删除失败', 'error');
+            }
+        }
     </script>
 </body>
 </html>

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, DateTime, String, Text
+from sqlalchemy import JSON, DateTime, String, Text, Integer, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -12,10 +12,6 @@ class Base(DeclarativeBase):
 
 
 class KnowledgeBase(Base):
-    """
-    知识库元数据模型
-    """
-
     __tablename__ = "knowledge_bases"
 
     id: Mapped[str] = mapped_column(
@@ -46,3 +42,25 @@ class KnowledgeBase(Base):
         return (
             f"<KnowledgeBase(name='{self.name}', collection='{self.collection_name}')>"
         )
+
+
+class KnowledgeDocument(Base):
+    __tablename__ = "knowledge_documents"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    kb_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("knowledge_bases.id"), index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    extension: Mapped[str] = mapped_column(String(20), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=True)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+    stored_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

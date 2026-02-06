@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
-from rag.models import Base, KnowledgeBase
+from rag.models import Base, KnowledgeBase, KnowledgeDocument
 from utils.config_handler import config
 from utils.logger_handler import get_logger
 
@@ -169,6 +169,7 @@ class DBManager:
             if not kb:
                 return False
 
+            session.query(KnowledgeDocument).filter(KnowledgeDocument.kb_id == kb_id).delete()
             session.delete(kb)
             session.commit()
             return True
@@ -179,6 +180,76 @@ class DBManager:
         finally:
             session.close()
 
+
+    # --- 文档 CRUD 操作 ---
+
+    def create_document(
+        self,
+        kb_id: str,
+        filename: str,
+        stored_path: str,
+        size: int,
+        extension: str,
+        mime_type: str = None,
+    ) -> KnowledgeDocument:
+        session = self.get_session()
+        try:
+            doc = KnowledgeDocument(
+                kb_id=kb_id,
+                filename=filename,
+                stored_path=stored_path,
+                size=size,
+                extension=extension,
+                mime_type=mime_type,
+            )
+            session.add(doc)
+            session.commit()
+            session.refresh(doc)
+            return doc
+        except Exception as e:
+            session.rollback()
+            logger.error(f"创建文档失败: {e}")
+            raise
+        finally:
+            session.close()
+
+    def list_documents(self, kb_id: str) -> List[KnowledgeDocument]:
+        session = self.get_session()
+        try:
+            return session.query(KnowledgeDocument).filter(KnowledgeDocument.kb_id == kb_id).order_by(KnowledgeDocument.created_at.desc()).all()
+        finally:
+            session.close()
+
+    def get_document(self, kb_id: str, doc_id: str) -> Optional[KnowledgeDocument]:
+        session = self.get_session()
+        try:
+            return (
+                session.query(KnowledgeDocument)
+                .filter(KnowledgeDocument.id == doc_id, KnowledgeDocument.kb_id == kb_id)
+                .first()
+            )
+        finally:
+            session.close()
+
+    def delete_document(self, kb_id: str, doc_id: str) -> bool:
+        session = self.get_session()
+        try:
+            doc = (
+                session.query(KnowledgeDocument)
+                .filter(KnowledgeDocument.id == doc_id, KnowledgeDocument.kb_id == kb_id)
+                .first()
+            )
+            if not doc:
+                return False
+            session.delete(doc)
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            logger.error(f"删除文档失败: {e}")
+            raise
+        finally:
+            session.close()
 
 # 全局数据库实例
 db_manager = DBManager()
