@@ -71,7 +71,7 @@
                 <div class="flex justify-between items-center mb-6">
                     <div class="flex gap-3">
                         <div class="relative">
-                            <input type="file" id="uploadInput" class="hidden" multiple onchange="handleFileSelect(event)">
+                            <input type="file" id="uploadInput" class="hidden" multiple accept=".pdf,.txt" onchange="handleFileSelect(event)">
                             <button onclick="document.getElementById('uploadInput').click()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
                                 <i class="fa-solid fa-cloud-arrow-up"></i> 上传文档
                             </button>
@@ -344,7 +344,7 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
                                 <i class="fa-regular fa-file-lines text-gray-400 mr-3"></i>
-                                <span class="text-sm font-medium text-gray-900">${escapeHtml(doc.filename)}</span>
+                                <a href="#" onclick="downloadDocument(event, '${doc.id}', '${escapeHtml(doc.filename)}')" class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" title="点击下载">${escapeHtml(doc.filename)}</a>
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -373,11 +373,39 @@
             const files = e.target.files;
             if (!files.length) return;
             
+            const allowedTypes = ['pdf', 'txt'];
+
             for (let file of files) {
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (!allowedTypes.includes(ext)) {
+                    showToast(`不支持的文件类型: ${file.name}. 仅支持: ${allowedTypes.join(', ')}`, 'error');
+                    continue;
+                }
                 await uploadFile(file);
             }
             e.target.value = ''; 
             fetchDocuments(activeKBId);
+        }
+
+        async function downloadDocument(event, docId, filename) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            try {
+                const url = `${API_BASE}/kb/${activeKBId}/documents/${docId}/download`;
+                
+                // 创建临时链接触发下载
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename; // 尝试提示浏览器下载文件名
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showToast(`开始下载: ${filename}`);
+            } catch (e) {
+                showToast('下载请求失败', 'error');
+            }
         }
 
         async function uploadFile(file) {

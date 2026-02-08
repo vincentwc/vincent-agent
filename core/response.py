@@ -9,7 +9,7 @@ T = TypeVar("T")
 
 class BaseResponse(BaseModel, Generic[T]):
     code: int = StatusCode.SUCCESS
-    message: str = "success"
+    message: str = "操作成功"
     data: Optional[T] = None
 
     @classmethod
@@ -33,6 +33,6 @@ class BaseResponse(BaseModel, Generic[T]):
                 else:
                     message = StatusCode(code).description
             except (ValueError, AttributeError):
-                message = "error"
+                message = "未知错误"
 
         return cls(code=code, message=message, data=data)

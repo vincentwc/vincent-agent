@@ -71,6 +71,7 @@ class MD5Manager:
                 with open(self.md5_store_path, "a", encoding="utf-8") as f:
                     f.write(md5_hex + "\n")
             except Exception as e:
+                self.processed_md5s.discard(md5_hex)
                 logger.error(f"保存 MD5 值失败: {e}")
 
 

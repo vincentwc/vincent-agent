@@ -3,10 +3,12 @@ import shutil
 import uuid
 from typing import List, Optional
 
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
+from core.codes import StatusCode
 from rag.db import db_manager
 from rag.models import KnowledgeBase, KnowledgeDocument
+from utils.config_handler import config
 from utils.logger_handler import get_logger
 from utils.path_tool import get_abs_path
 
@@ -39,10 +41,10 @@ class KnowledgeBaseService:
                 meta_info=meta_info,
             )
             # TODO: 在此处调用 Chroma 初始化 Collection
-            logger.info(f"Created knowledge base: {name} (ID: {kb.id})")
+            logger.info(f"创建知识库成功: {name} (ID: {kb.id})")
             return kb
         except Exception as e:
-            logger.error(f"Error creating knowledge base: {e}")
+            logger.error(f"创建知识库失败: {e}")
             raise
 
     def list_knowledge_bases(
@@ -72,10 +74,10 @@ class KnowledgeBaseService:
                 kb_id=kb_id, tenant_id=tenant_id, **kwargs
             )
             if kb:
-                logger.info(f"Updated knowledge base: {kb.name} (ID: {kb.id})")
+                logger.info(f"更新知识库成功: {kb.name} (ID: {kb.id})")
             return kb
         except Exception as e:
-            logger.error(f"Error updating knowledge base: {e}")
+            logger.error(f"更新知识库失败: {e}")
             raise
 
     def delete_knowledge_base(self, kb_id: str, tenant_id: str) -> bool:
@@ -94,11 +96,11 @@ class KnowledgeBaseService:
             if success:
                 # TODO: 在此处调用 Chroma 删除对应的 Collection
                 # collection_name = kb.collection_name
-                logger.info(f"Deleted knowledge base: {kb.name} (ID: {kb_id})")
+                logger.info(f"删除知识库成功: {kb.name} (ID: {kb_id})")
 
             return success
         except Exception as e:
-            logger.error(f"Error deleting knowledge base: {e}")
+            logger.error(f"删除知识库失败: {e}")
             raise
 
     # --- Document Management ---
@@ -108,6 +110,21 @@ class KnowledgeBaseService:
         上传文档到知识库
         """
         try:
+            # 0. 校验文件类型
+            allowed_types = config.chroma.get("allowed_file_type", ["pdf", "txt"])
+            # 确保配置中的类型都是小写，并且带点（如果配置没有带点的话）
+            # 这里假设配置是 ["pdf", "txt"]
+
+            # 获取文件扩展名 (包含点, 如 .pdf)
+            _, ext = os.path.splitext(file.filename)
+            ext = ext.lower().lstrip(".")  # 去掉点，统一比较
+
+            if ext not in allowed_types:
+                raise HTTPException(
+                    status_code=StatusCode.BAD_REQUEST,
+                    detail=f"不支持的文件类型: {ext}. 允许的类型: {allowed_types}",
+                )
+
             # 1. 确定存储路径
             # 结构: data/uploads/{kb_id}/{filename}
             upload_dir = get_abs_path(f"data/uploads/{kb_id}")
@@ -135,11 +152,28 @@ class KnowledgeBaseService:
                 mime_type=mime_type,
             )
 
-            logger.info(f"Uploaded document: {file.filename} to KB: {kb_id}")
+            logger.info(f"文档上传成功: {file.filename} 到知识库: {kb_id}")
             return doc
-        except Exception as e:
-            logger.error(f"Error uploading document: {e}")
+        except HTTPException:
             raise
+        except Exception as e:
+            logger.error(f"文档上传失败: {e}")
+            raise
+
+    def download_document(self, kb_id: str, doc_id: str) -> str:
+        """
+        获取文档下载路径
+        """
+        doc = db_manager.get_document(kb_id=kb_id, doc_id=doc_id)
+        if not doc:
+            raise HTTPException(status_code=StatusCode.NOT_FOUND, detail="文档未找到")
+
+        if not os.path.exists(doc.stored_path):
+            raise HTTPException(
+                status_code=StatusCode.NOT_FOUND, detail="服务器上找不到文件"
+            )
+
+        return doc.stored_path
 
     def list_documents(self, kb_id: str) -> List[KnowledgeDocument]:
         """
@@ -162,12 +196,12 @@ class KnowledgeBaseService:
                 try:
                     os.remove(doc.stored_path)
                 except OSError as e:
-                    logger.warning(f"Failed to delete file {doc.stored_path}: {e}")
+                    logger.warning(f"删除文件失败 {doc.stored_path}: {e}")
 
             # 3. 删除数据库记录
             return db_manager.delete_document(kb_id=kb_id, doc_id=doc_id)
         except Exception as e:
-            logger.error(f"Error deleting document: {e}")
+            logger.error(f"删除文档失败: {e}")
             raise
 
 

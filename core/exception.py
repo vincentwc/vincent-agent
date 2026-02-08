@@ -34,7 +34,7 @@ def register_exception_handlers(app: FastAPI):
 
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        logger.error(f"Global exception: {exc}", exc_info=True)
+        logger.error(f"全局异常: {exc}", exc_info=True)
         return JSONResponse(
             status_code=StatusCode.SERVER_ERROR,
             content=BaseResponse.error(

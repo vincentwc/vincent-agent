@@ -21,48 +21,21 @@ class DBManager:
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super(DBManager, cls).__new__(cls)
+            cls._instance._initialize()
         return cls._instance
 
-    def __init__(self):
-        if hasattr(self, "_initialized"):
-            return
+    def _initialize(self):
+        """初始化数据库连接"""
+        db_url = config.database.get("url", "sqlite:///./rag.db")
+        connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
 
-        self._init_engine()
-        self._initialized = True
-
-    def _init_engine(self):
-        """初始化数据库引擎"""
-        db_config = config.database
-        db_url = db_config.get("url", "sqlite:///data/rag.db")
-
-        # 引擎配置
-        engine_kwargs = {
-            "echo": db_config.get("echo", False),
-        }
-
-        # 连接池配置 (SQLite 不支持 pool_size)
-        if "sqlite" not in db_url:
-            engine_kwargs["pool_size"] = db_config.get("pool_size", 5)
-            engine_kwargs["max_overflow"] = db_config.get("max_overflow", 10)
-
-        try:
-            self.engine = create_engine(db_url, **engine_kwargs)
-
-            # 创建所有表 (如果不存在)
-            # 在生产环境中，建议使用 Alembic 进行迁移管理
-            Base.metadata.create_all(self.engine)
-
-            # 创建线程安全的 Session 工厂
-            self.SessionLocal = scoped_session(
-                sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-            )
-
-            logger.info(
-                f"数据库引擎已初始化: {db_url.split('@')[-1] if '@' in db_url else db_url}"
-            )
-        except Exception as e:
-            logger.error(f"数据库初始化失败: {e}")
-            raise
+        self.engine = create_engine(db_url, connect_args=connect_args)
+        # 初始化表结构
+        Base.metadata.create_all(bind=self.engine)
+        self.SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=self.engine
+        )
+        logger.info(f"数据库引擎已初始化: {db_url}")
 
     def get_session(self) -> Session:
         """获取数据库会话"""
@@ -111,13 +84,17 @@ class DBManager:
         finally:
             session.close()
 
-    def get_knowledge_base_by_name(self, name: str, tenant_id: str) -> Optional[KnowledgeBase]:
+    def get_knowledge_base_by_name(
+        self, name: str, tenant_id: str
+    ) -> Optional[KnowledgeBase]:
         """根据名称获取知识库"""
         session = self.get_session()
         try:
             return (
                 session.query(KnowledgeBase)
-                .filter(KnowledgeBase.name == name, KnowledgeBase.tenant_id == tenant_id)
+                .filter(
+                    KnowledgeBase.name == name, KnowledgeBase.tenant_id == tenant_id
+                )
                 .first()
             )
         finally:
@@ -136,11 +113,17 @@ class DBManager:
         finally:
             session.close()
 
-    def update_knowledge_base(self, kb_id: str, tenant_id: str, **kwargs) -> Optional[KnowledgeBase]:
+    def update_knowledge_base(
+        self, kb_id: str, tenant_id: str, **kwargs
+    ) -> Optional[KnowledgeBase]:
         """更新知识库信息"""
         session = self.get_session()
         try:
-            kb = session.query(KnowledgeBase).filter(KnowledgeBase.id == kb_id, KnowledgeBase.tenant_id == tenant_id).first()
+            kb = (
+                session.query(KnowledgeBase)
+                .filter(KnowledgeBase.id == kb_id, KnowledgeBase.tenant_id == tenant_id)
+                .first()
+            )
             if not kb:
                 return None
 
@@ -165,11 +148,17 @@ class DBManager:
         """删除知识库"""
         session = self.get_session()
         try:
-            kb = session.query(KnowledgeBase).filter(KnowledgeBase.id == kb_id, KnowledgeBase.tenant_id == tenant_id).first()
+            kb = (
+                session.query(KnowledgeBase)
+                .filter(KnowledgeBase.id == kb_id, KnowledgeBase.tenant_id == tenant_id)
+                .first()
+            )
             if not kb:
                 return False
 
-            session.query(KnowledgeDocument).filter(KnowledgeDocument.kb_id == kb_id).delete()
+            session.query(KnowledgeDocument).filter(
+                KnowledgeDocument.kb_id == kb_id
+            ).delete()
             session.delete(kb)
             session.commit()
             return True
@@ -179,7 +168,6 @@ class DBManager:
             raise
         finally:
             session.close()
-
 
     # --- 文档 CRUD 操作 ---
 
@@ -216,7 +204,12 @@ class DBManager:
     def list_documents(self, kb_id: str) -> List[KnowledgeDocument]:
         session = self.get_session()
         try:
-            return session.query(KnowledgeDocument).filter(KnowledgeDocument.kb_id == kb_id).order_by(KnowledgeDocument.created_at.desc()).all()
+            return (
+                session.query(KnowledgeDocument)
+                .filter(KnowledgeDocument.kb_id == kb_id)
+                .order_by(KnowledgeDocument.created_at.desc())
+                .all()
+            )
         finally:
             session.close()
 
@@ -225,7 +218,9 @@ class DBManager:
         try:
             return (
                 session.query(KnowledgeDocument)
-                .filter(KnowledgeDocument.id == doc_id, KnowledgeDocument.kb_id == kb_id)
+                .filter(
+                    KnowledgeDocument.id == doc_id, KnowledgeDocument.kb_id == kb_id
+                )
                 .first()
             )
         finally:
@@ -236,7 +231,9 @@ class DBManager:
         try:
             doc = (
                 session.query(KnowledgeDocument)
-                .filter(KnowledgeDocument.id == doc_id, KnowledgeDocument.kb_id == kb_id)
+                .filter(
+                    KnowledgeDocument.id == doc_id, KnowledgeDocument.kb_id == kb_id
+                )
                 .first()
             )
             if not doc:
@@ -250,6 +247,7 @@ class DBManager:
             raise
         finally:
             session.close()
+
 
 # 全局数据库实例
 db_manager = DBManager()
