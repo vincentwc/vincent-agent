@@ -10,10 +10,14 @@ from rag.vector_store import VectoreStoreService
 from utils.config_handler import config
 from utils.logger_handler import get_logger
 from utils.path_tool import get_abs_path
+from core.exception import register_exception_handlers
 
 logger = get_logger(__name__)
 
 app = FastAPI(title="Vincent Agent API")
+
+# Register Global Exception Handlers
+register_exception_handlers(app)
 
 # Include Routers
 app.include_router(knowledge_base.router)

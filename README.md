@@ -1,7 +1,19 @@
 # vincent-agent
 
-待实现的功能：
+## 项目依赖管理
+
+本项目使用 `requirements.txt` 管理依赖。
+
+### 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+## 功能列表
+
 - [x] 支持页面上传知识库文档
-- [ ] 空知识库的增删改查
+- [x] 知识库的增删改查
+
 
 

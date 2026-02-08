@@ -53,6 +53,57 @@
             <div id="kbGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <!-- KB Cards will be injected here -->
             </div>
+
+            <!-- KB Details View (Hidden by default) -->
+            <div id="kbDetails" class="hidden">
+                <!-- Breadcrumb / Header -->
+                <div class="flex items-center gap-4 mb-6">
+                    <button onclick="showDashboard()" class="text-gray-500 hover:text-gray-700 bg-white p-2 rounded-lg shadow-sm border border-gray-200 transition-colors">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <div>
+                        <h2 id="detailTitle" class="text-2xl font-bold text-gray-900"></h2>
+                        <p id="detailDesc" class="text-gray-500 text-sm mt-1"></p>
+                    </div>
+                </div>
+
+                <!-- Action Bar -->
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex gap-3">
+                        <div class="relative">
+                            <input type="file" id="uploadInput" class="hidden" multiple onchange="handleFileSelect(event)">
+                            <button onclick="document.getElementById('uploadInput').click()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> 上传文档
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <span id="docCount">0</span> 个文档
+                    </div>
+                </div>
+
+                <!-- Document List -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文件名</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">大小</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">上传时间</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="docListBody" class="bg-white divide-y divide-gray-200">
+                            <!-- Rows will be injected here -->
+                        </tbody>
+                    </table>
+                    <div id="docEmptyState" class="hidden text-center py-12">
+                        <i class="fa-regular fa-file text-4xl text-gray-300 mb-3"></i>
+                        <p class="text-gray-500">暂无文档，请上传</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -99,17 +150,21 @@
 
     <script>
         const API_BASE = window.location.origin;
-        const TENANT_ID = "default_tenant"; // 暂时硬编码
-        let currentKBs = []; // Store KBs for easy access
+        const TENANT_ID = "default_tenant"; 
+        let currentKBs = [];
+        let activeKBId = null;
 
-        // Load KBs on start
         document.addEventListener('DOMContentLoaded', fetchKBs);
 
+        // --- KB Management ---
         async function fetchKBs() {
             showLoading(true);
             try {
                 const res = await fetch(`${API_BASE}/kb/list?tenant_id=${TENANT_ID}`);
-                const data = await res.json();
+                const json = await res.json();
+                if (json.code !== 200) throw new Error(json.message);
+                
+                const data = json.data;
                 currentKBs = data;
                 renderKBs(data);
             } catch (error) {
@@ -136,16 +191,18 @@
 
             kbs.forEach(kb => {
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative group';
+                card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative group cursor-pointer';
+                card.onclick = (e) => {
+                    if (e.target.closest('button')) return; // Prevent triggering when clicking actions
+                    openKBDetails(kb.id);
+                };
+                
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-4">
                         <div class="bg-blue-100 text-blue-600 w-10 h-10 rounded-lg flex items-center justify-center">
                             <i class="fa-solid fa-book"></i>
                         </div>
                         <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="openDocModal('${kb.id}', '${escapeHtml(kb.name)}')" class="text-gray-400 hover:text-indigo-600 p-1.5 rounded-md hover:bg-indigo-50 transition-colors" title="管理文档">
-                                <i class="fa-solid fa-folder-open"></i>
-                            </button>
                             <button onclick="openEditModal('${kb.id}')" class="text-gray-400 hover:text-blue-500 p-1.5 rounded-md hover:bg-blue-50 transition-colors" title="编辑">
                                 <i class="fa-solid fa-pen"></i>
                             </button>
@@ -174,7 +231,6 @@
             const kbId = document.getElementById('kbId').value;
             const isEdit = !!kbId;
 
-            // Loading state
             btn.disabled = true;
             spinner.classList.remove('hidden');
             btnText.textContent = isEdit ? '保存中...' : '创建中...';
@@ -200,11 +256,12 @@
                     body: JSON.stringify(payload)
                 });
                 
-                if (!res.ok) throw new Error(isEdit ? '更新失败' : '创建失败');
+                const json = await res.json();
+                if (!res.ok || json.code !== 200) throw new Error(json.message || (isEdit ? '更新失败' : '创建失败'));
                 
                 showToast(isEdit ? '知识库已更新' : '知识库创建成功');
                 closeModal();
-                fetchKBs(); // Reload list
+                fetchKBs();
             } catch (error) {
                 showToast(error.message, 'error');
             } finally {
@@ -222,12 +279,142 @@
                     method: 'DELETE'
                 });
                 
-                if (!res.ok) throw new Error('删除失败');
+                const json = await res.json();
+                if (!res.ok || json.code !== 200) throw new Error(json.message || '删除失败');
                 
                 showToast('知识库已删除');
                 fetchKBs();
             } catch (error) {
                 showToast(error.message, 'error');
+            }
+        }
+
+        // --- View Switching ---
+        function showDashboard() {
+            document.getElementById('kbGrid').classList.remove('hidden');
+            document.getElementById('kbDetails').classList.add('hidden');
+            // If empty state was showing before, logic in fetchKBs will handle it, but we can hide details for sure
+            activeKBId = null;
+            fetchKBs(); 
+        }
+
+        function openKBDetails(id) {
+            const kb = currentKBs.find(k => k.id === id);
+            if (!kb) return;
+            
+            activeKBId = id;
+            document.getElementById('kbGrid').classList.add('hidden');
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('kbDetails').classList.remove('hidden');
+            
+            document.getElementById('detailTitle').textContent = kb.name;
+            document.getElementById('detailDesc').textContent = kb.description || '暂无描述';
+            
+            fetchDocuments(id);
+        }
+
+        // --- Document Management ---
+        async function fetchDocuments(kbId) {
+            const tbody = document.getElementById('docListBody');
+            const empty = document.getElementById('docEmptyState');
+            
+            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">加载中...</td></tr>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/kb/${kbId}/documents`);
+                const json = await res.json();
+                
+                if (json.code !== 200) throw new Error(json.message);
+                
+                const docs = json.data;
+                document.getElementById('docCount').textContent = docs.length;
+                tbody.innerHTML = '';
+
+                if (docs.length === 0) {
+                    empty.classList.remove('hidden');
+                    return;
+                }
+                
+                empty.classList.add('hidden');
+                
+                docs.forEach(doc => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50 transition-colors';
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <i class="fa-regular fa-file-lines text-gray-400 mr-3"></i>
+                                <span class="text-sm font-medium text-gray-900">${escapeHtml(doc.filename)}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${(doc.size / 1024).toFixed(1)} KB
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${formatDate(doc.created_at)}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                已上传
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="deleteDocument('${doc.id}')" class="text-red-600 hover:text-red-900">删除</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-red-500">加载失败</td></tr>';
+            }
+        }
+
+        async function handleFileSelect(e) {
+            const files = e.target.files;
+            if (!files.length) return;
+            
+            for (let file of files) {
+                await uploadFile(file);
+            }
+            e.target.value = ''; 
+            fetchDocuments(activeKBId);
+        }
+
+        async function uploadFile(file) {
+            const fd = new FormData();
+            fd.append('file', file);
+            
+            try {
+                showToast(`正在上传 ${file.name}...`);
+                const res = await fetch(`${API_BASE}/kb/${activeKBId}/documents/upload`, {
+                    method: 'POST',
+                    body: fd
+                });
+                
+                const json = await res.json();
+                if (!res.ok || json.code !== 200) throw new Error(json.message || '上传失败');
+                
+                showToast(`${file.name} 上传成功`);
+            } catch (e) {
+                showToast(`${file.name} 上传失败: ${e.message}`, 'error');
+            }
+        }
+
+        async function deleteDocument(docId) {
+            if (!confirm('确定要删除这个文档吗？')) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/kb/${activeKBId}/documents/${docId}`, {
+                    method: 'DELETE'
+                });
+                
+                const json = await res.json();
+                if (!res.ok || json.code !== 200) throw new Error(json.message || '删除失败');
+                
+                showToast('文档已删除');
+                fetchDocuments(activeKBId);
+            } catch (e) {
+                showToast('删除失败', 'error');
             }
         }
 
@@ -306,106 +493,6 @@
         document.getElementById('modal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('modal')) closeModal();
         });
-
-        // --- Document management ---
-        function openDocModal(kbId, kbName) {
-            const modal = document.createElement('div');
-            modal.id = 'docModal';
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
-            modal.innerHTML = `
-                <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-xl font-bold text-gray-900">管理文档 · ${kbName}</h3>
-                        <button onclick="closeDocModal()" class="text-gray-400 hover:text-gray-600">
-                            <i class="fa-solid fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="mb-4 text-sm text-gray-500">
-                        允许上传的类型: .html, .xlsx, .docx, .xls, .md, .pdf, .markdown, .csv, .txt
-                    </div>
-                    <div class="flex items-center gap-3 mb-6">
-                        <input id="docFileInput" type="file" accept=".html,.xlsx,.docx,.xls,.md,.pdf,.markdown,.csv,.txt" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                        <button onclick="uploadDoc('${kbId}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">上传</button>
-                    </div>
-                    <div id="docList" class="space-y-2">
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            fetchDocs(kbId);
-        }
-
-        function closeDocModal() {
-            const m = document.getElementById('docModal');
-            if (m) m.remove();
-        }
-
-        async function fetchDocs(kbId) {
-            const listEl = document.getElementById('docList');
-            listEl.innerHTML = '<div class="text-gray-400 text-sm">加载中...</div>';
-            try {
-                const res = await fetch(`${API_BASE}/kb/${kbId}/files`);
-                const docs = await res.json();
-                if (docs.length === 0) {
-                    listEl.innerHTML = '<div class="text-gray-400 text-sm">暂无文档</div>';
-                    return;
-                }
-                listEl.innerHTML = '';
-                docs.forEach(d => {
-                    const row = document.createElement('div');
-                    row.className = 'flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg';
-                    row.innerHTML = `
-                        <div class="flex items-center gap-3">
-                            <i class="fa-regular fa-file-lines text-gray-500"></i>
-                            <a href="${API_BASE}/kb/${d.kb_id}/files/${d.id}/download" class="text-blue-600 hover:text-blue-700 font-medium" target="_blank">${escapeHtml(d.filename)}</a>
-                            <span class="text-xs text-gray-400">(${(d.size/1024).toFixed(1)} KB)</span>
-                        </div>
-                        <button onclick="deleteDoc('${d.kb_id}', '${d.id}')" class="text-gray-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition-colors" title="删除">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    `;
-                    listEl.appendChild(row);
-                });
-            } catch (e) {
-                listEl.innerHTML = '<div class="text-red-500 text-sm">加载失败</div>';
-            }
-        }
-
-        async function uploadDoc(kbId) {
-            const input = document.getElementById('docFileInput');
-            if (!input.files || !input.files[0]) {
-                showToast('请选择文件', 'error');
-                return;
-            }
-            const filename = input.files[0].name.toLowerCase();
-            const allowed = ['.html','.xlsx','.docx','.xls','.md','.pdf','.markdown','.csv','.txt'];
-            if (!allowed.some(ext => filename.endsWith(ext))) {
-                showToast('不支持的文件类型', 'error');
-                return;
-            }
-            const fd = new FormData();
-            fd.append('file', input.files[0]);
-            try {
-                const res = await fetch(`${API_BASE}/kb/${kbId}/files/upload`, { method: 'POST', body: fd });
-                if (!res.ok) throw new Error('上传失败');
-                showToast('上传成功');
-                fetchDocs(kbId);
-                input.value = '';
-            } catch (e) {
-                showToast('上传失败', 'error');
-            }
-        }
-
-        async function deleteDoc(kbId, docId) {
-            try {
-                const res = await fetch(`${API_BASE}/kb/${kbId}/files/${docId}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error('删除失败');
-                showToast('已删除');
-                fetchDocs(kbId);
-            } catch (e) {
-                showToast('删除失败', 'error');
-            }
-        }
     </script>
 </body>
 </html>
