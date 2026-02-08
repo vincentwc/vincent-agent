@@ -13,8 +13,18 @@ from schemas.knowledge_base import (
     KBUpdateRequest,
 )
 from services.knowledge_base_service import kb_service
+from utils.config_handler import config
 
 router = APIRouter()
+
+
+@router.get("/config", response_model=BaseResponse)
+async def get_kb_config():
+    """
+    获取知识库配置（如允许的文件类型）
+    """
+    allowed_types = config.chroma.get("allowed_file_type", ["pdf", "txt"])
+    return BaseResponse.success(data={"allowed_file_types": allowed_types})
 
 
 @router.post("/create", response_model=BaseResponse[KBResponse])
@@ -47,7 +57,7 @@ async def get_knowledge_base(kb_id: str, tenant_id: str = "default_tenant"):
     """
     kb = kb_service.get_knowledge_base(kb_id, tenant_id)
     if not kb:
-        raise HTTPException(status_code=StatusCode.NOT_FOUND, detail="未找到知识库")
+        raise HTTPException(status_code=StatusCode.NOT_FOUND, detail="知识库不存在")    
     return BaseResponse.success(KBResponse.model_validate(kb))
 
 

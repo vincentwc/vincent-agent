@@ -190,7 +190,7 @@ class VectoreStoreService:
             logger.info(f"成功处理并索引文件: {file_path}")
 
         except Exception as e:
-            logger.error(f"处理文件出错 {file_path}: {e}")
+            logger.exception(f"处理文件出错 {file_path}: {e}")
 
 
 if __name__ == "__main__":

@@ -67,15 +67,36 @@
                     </div>
                 </div>
 
-                <!-- Action Bar -->
+                <!-- Upload Area -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">上传文本文件</h3>
+                    <div id="dropzone" 
+                         class="border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 p-8 text-center transition-all duration-200 ease-in-out hover:border-blue-400 hover:bg-blue-50 group cursor-pointer"
+                         onclick="document.getElementById('uploadInput').click()"
+                         ondragover="handleDragOver(event)"
+                         ondragleave="handleDragLeave(event)"
+                         ondrop="handleDrop(event)">
+                        
+                        <input type="file" id="uploadInput" class="hidden" multiple accept=".pdf,.txt" onchange="handleFileSelect(event)">
+                        
+                        <div class="flex flex-col items-center justify-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-blue-600 mb-2 group-hover:scale-110 transition-transform">
+                                <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                            </div>
+                            <p class="text-gray-900 font-medium text-lg">
+                                拖拽文件或文件夹至此，或者 <span class="text-blue-600 hover:text-blue-700 hover:underline">选择文件</span>
+                            </p>
+                            <p id="uploadHint" class="text-gray-500 text-sm max-w-2xl mx-auto leading-relaxed">
+                                正在加载配置...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Bar (Modified) -->
                 <div class="flex justify-between items-center mb-6">
                     <div class="flex gap-3">
-                        <div class="relative">
-                            <input type="file" id="uploadInput" class="hidden" multiple accept=".pdf,.txt" onchange="handleFileSelect(event)">
-                            <button onclick="document.getElementById('uploadInput').click()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                                <i class="fa-solid fa-cloud-arrow-up"></i> 上传文档
-                            </button>
-                        </div>
+                        <!-- Removed old upload button -->
                     </div>
                     <div class="text-sm text-gray-500">
                         <span id="docCount">0</span> 个文档
@@ -153,8 +174,42 @@
         const TENANT_ID = "default_tenant"; 
         let currentKBs = [];
         let activeKBId = null;
+        let allowedFileTypes = ['pdf', 'txt']; // 默认值，会被后端配置覆盖
 
-        document.addEventListener('DOMContentLoaded', fetchKBs);
+        document.addEventListener('DOMContentLoaded', async () => {
+            await fetchConfig();
+            fetchKBs();
+        });
+
+        async function fetchConfig() {
+            try {
+                const res = await fetch(`${API_BASE}/kb/config`);
+                const json = await res.json();
+                if (json.code === 200 && json.data.allowed_file_types) {
+                    allowedFileTypes = json.data.allowed_file_types;
+                    updateUploadUI();
+                }
+            } catch (e) {
+                console.error("Failed to load config:", e);
+                // 保持默认值
+                updateUploadUI();
+            }
+        }
+
+        function updateUploadUI() {
+            // 更新提示文本
+            const typesStr = allowedFileTypes.map(t => t.toUpperCase()).join('、');
+            const hint = document.getElementById('uploadHint');
+            if (hint) {
+                hint.textContent = `已支持 ${typesStr}格式文件`;
+            }
+
+            // 更新 input accept
+            const input = document.getElementById('uploadInput');
+            if (input) {
+                input.accept = allowedFileTypes.map(t => `.${t}`).join(',');
+            }
+        }
 
         // --- KB Management ---
         async function fetchKBs() {
@@ -369,21 +424,64 @@
             }
         }
 
+        // --- Drag and Drop ---
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const dropzone = document.getElementById('dropzone');
+            dropzone.classList.add('border-blue-500', 'bg-blue-50');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const dropzone = document.getElementById('dropzone');
+            dropzone.classList.remove('border-blue-500', 'bg-blue-50');
+        }
+
+        async function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const dropzone = document.getElementById('dropzone');
+            dropzone.classList.remove('border-blue-500', 'bg-blue-50');
+            
+            const files = e.dataTransfer.files;
+            if (!files.length) return;
+            
+            await processFiles(files);
+        }
+
         async function handleFileSelect(e) {
             const files = e.target.files;
             if (!files.length) return;
-            
-            const allowedTypes = ['pdf', 'txt'];
+            await processFiles(files);
+            e.target.value = ''; 
+        }
+
+        async function processFiles(files) {
+            const maxFiles = 5;
+            const maxSize = 15 * 1024 * 1024; // 15MB
+
+            if (files.length > maxFiles) {
+                showToast(`一次最多上传 ${maxFiles} 个文件`, 'error');
+                return;
+            }
 
             for (let file of files) {
                 const ext = file.name.split('.').pop().toLowerCase();
-                if (!allowedTypes.includes(ext)) {
-                    showToast(`不支持的文件类型: ${file.name}. 仅支持: ${allowedTypes.join(', ')}`, 'error');
+                
+                if (!allowedFileTypes.includes(ext)) {
+                    showToast(`不支持的文件类型: ${file.name}. 仅支持: ${allowedFileTypes.join(', ')}`, 'error');
                     continue;
                 }
+                
+                if (file.size > maxSize) {
+                    showToast(`文件过大: ${file.name}. 最大支持 15MB`, 'error');
+                    continue;
+                }
+
                 await uploadFile(file);
             }
-            e.target.value = ''; 
             fetchDocuments(activeKBId);
         }
 
