@@ -76,7 +76,11 @@ class AgentService:
                 # Chroma filter syntax: {"field": {"$in": [values]}}
                 filter_rule = {"kb_id": {"$in": kb_ids}}
 
-                retriever = vector_store.get_retriever(k=3, filter=filter_rule)
+                # 使用标准的 similarity 模式，避免因分数转换导致的 UserWarning
+                retriever = vector_store.get_retriever(
+                    k=config.chroma.get("k", 3),
+                    filter=filter_rule,
+                )
                 docs = retriever.invoke(query)
                 if docs:
                     context = "\n\n".join([doc.page_content for doc in docs])

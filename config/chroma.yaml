@@ -5,6 +5,7 @@ chunk_size: 1000
 chunk_overlap: 100
 k: 3
 separators: ["\n\n", "\n", " ", ".", "?", "!", ",", "，", "！", "？"," "]
+score_threshold: 0.5
 
 md5_hex_store: md5.txt
 

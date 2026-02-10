@@ -188,22 +188,44 @@ class VectoreStoreService:
         except Exception as e:
             logger.error(f"删除知识库向量失败: {e}")
 
-    def get_retriever(self, k: Optional[int] = None, **kwargs) -> VectorStoreRetriever:
+    def get_retriever(
+        self,
+        k: Optional[int] = None,
+        score_threshold: Optional[float] = None,
+        **kwargs,
+    ) -> VectorStoreRetriever:
         """
         获取检索器。
 
         Args:
             k (Optional[int]): 检索返回的文档数量。如果未提供，使用配置中的默认值。
-            **kwargs: 传递给 as_retriever 的其他参数。
+            score_threshold (Optional[float]): 相似度阈值（0-1），低于此值的文档将被过滤。
+            **kwargs: 传递给 search_kwargs 的其他参数。
 
         Returns:
             VectorStoreRetriever: LangChain 检索器实例。
         """
-        logger.info(f"创建检索器，参数: k={k}, kwargs={kwargs}")
-        search_kwargs = {"k": k or config.chroma.get("k", 5)}  # 默认返回5个文档
-        search_kwargs.update(kwargs)  # 合并其他参数
+        # 1. 确定 k 值
+        final_k = k or config.chroma.get("k", 5)
 
-        return self.vector_store.as_retriever(search_kwargs=search_kwargs)
+        logger.info(
+            f"创建检索器，参数: k={final_k}, score_threshold={score_threshold}, kwargs={kwargs}"
+        )
+
+        # 2. 构建 search_kwargs
+        search_kwargs = {"k": final_k}
+        search_kwargs.update(kwargs)  # 合并其他参数 (如 filter)
+
+        # 3. 根据是否提供阈值选择检索类型
+        if score_threshold is not None:
+            search_kwargs["score_threshold"] = score_threshold
+            search_type = "similarity_score_threshold"
+        else:
+            search_type = "similarity"
+
+        return self.vector_store.as_retriever(
+            search_type=search_type, search_kwargs=search_kwargs
+        )
 
     def load_documents(self, max_workers: int = 4):
         """
@@ -263,15 +285,3 @@ class VectoreStoreService:
 
         except Exception as e:
             logger.exception(f"处理文件出错 {file_path}: {e}")
-
-
-# if __name__ == "__main__":
-#     vector_store = VectoreStoreService()
-#     # Chroma filter syntax: {"field": {"$in": [values]}}
-#     filter_rule = {"kb_id": {'$in': ['775786d0-0960-4604-947a-def544c25d83']}}
-
-#     retriever = vector_store.get_retriever(k=3, filter=filter_rule)
-
-#     result = retriever.invoke("缠绕")
-
-#     print(result)
