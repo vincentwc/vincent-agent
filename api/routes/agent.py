@@ -5,6 +5,8 @@ from fastapi import APIRouter, HTTPException
 from core.codes import StatusCode
 from core.response import BaseResponse
 from schemas.agent import (
+    AgentChatRequest,
+    AgentChatResponse,
     AgentCreateRequest,
     AgentResponse,
     AgentUpdateRequest,
@@ -67,3 +69,21 @@ async def delete_agent(agent_id: str, tenant_id: str = "default_tenant"):
     if not success:
         raise HTTPException(status_code=StatusCode.NOT_FOUND, detail="智能体不存在")
     return BaseResponse.success(message="智能体已删除")
+
+
+@router.post("/agents/{agent_id}/chat", response_model=BaseResponse[AgentChatResponse])
+async def chat_agent(
+    agent_id: str,
+    request: AgentChatRequest,
+    tenant_id: str = "default_tenant",
+):
+    """智能体对话"""
+    try:
+        answer = agent_service.chat(agent_id, request.query, tenant_id)
+        return BaseResponse.success(AgentChatResponse(answer=answer))
+    except ValueError as e:
+        raise HTTPException(status_code=StatusCode.NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=StatusCode.INTERNAL_SERVER_ERROR, detail=f"对话失败: {str(e)}"
+        )

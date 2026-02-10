@@ -50,7 +50,11 @@ function renderAgents(agents) {
 
     agents.forEach(item => {
         const card = document.createElement('div');
-        card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative group';
+        card.className = 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative group cursor-pointer';
+        card.onclick = (e) => {
+            if (e.target.closest('button')) return;
+            openChat(item.id);
+        };
         
         // KB badges
         const kbBadges = item.knowledge_bases.map(kb => 
@@ -202,4 +206,127 @@ function openEditModal(id) {
 
 function closeModal() {
     document.getElementById('modal').classList.add('hidden');
+}
+
+// --- Chat Functions ---
+let activeChatAgentId = null;
+
+function openChat(agentId) {
+    const agent = currentAgents.find(a => a.id === agentId);
+    if (!agent) return;
+
+    activeChatAgentId = agentId;
+    
+    // Update UI
+    document.getElementById('agentGrid').classList.add('hidden');
+    document.getElementById('chatInterface').classList.remove('hidden');
+    
+    document.getElementById('chatAgentName').textContent = agent.name;
+    document.getElementById('chatAgentModel').textContent = agent.model_name;
+    
+    clearChat(); // Initialize with greeting
+    
+    document.getElementById('chatInput').focus();
+}
+
+function closeChat() {
+    activeChatAgentId = null;
+    document.getElementById('chatInterface').classList.add('hidden');
+    document.getElementById('agentGrid').classList.remove('hidden');
+}
+
+function clearChat() {
+    if (!activeChatAgentId) return;
+    const agent = currentAgents.find(a => a.id === activeChatAgentId);
+    const container = document.getElementById('chatMessages');
+    container.innerHTML = `
+        <div class="flex justify-start">
+            <div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none px-4 py-3 max-w-[80%]">
+                你好！我是 ${escapeHtml(agent.name)}，有什么可以帮你的吗？
+            </div>
+        </div>
+    `;
+}
+
+async function handleChatSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    if (!message || !activeChatAgentId) return;
+    
+    input.value = '';
+    
+    // User Message
+    appendMessage('user', message);
+    
+    // Show typing indicator
+    const typingId = showTypingIndicator();
+    
+    try {
+        const response = await apiFetch(`/agent/agents/${activeChatAgentId}/chat?tenant_id=${TENANT_ID}`, {
+            method: 'POST',
+            body: { query: message }
+        });
+        
+        removeTypingIndicator(typingId);
+        appendMessage('assistant', response.answer);
+    } catch (error) {
+        removeTypingIndicator(typingId);
+        appendMessage('system', '发送失败: ' + error.message);
+    }
+}
+
+function appendMessage(role, content) {
+    const container = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    
+    if (role === 'user') {
+        div.className = 'flex justify-end';
+        div.innerHTML = `
+            <div class="bg-purple-600 text-white rounded-2xl rounded-tr-none px-4 py-3 max-w-[80%]">
+                ${escapeHtml(content)}
+            </div>
+        `;
+    } else if (role === 'assistant') {
+        div.className = 'flex justify-start';
+        // Render markdown if possible, but for now plain text with newlines
+        const htmlContent = escapeHtml(content).replace(/\n/g, '<br>');
+        div.innerHTML = `
+            <div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none px-4 py-3 max-w-[80%]">
+                ${htmlContent}
+            </div>
+        `;
+    } else {
+        // System/Error
+        div.className = 'flex justify-center';
+        div.innerHTML = `
+            <div class="bg-red-50 text-red-500 text-xs rounded-lg px-3 py-1">
+                ${escapeHtml(content)}
+            </div>
+        `;
+    }
+    
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function showTypingIndicator() {
+    const container = document.getElementById('chatMessages');
+    const id = 'typing-' + Date.now();
+    const div = document.createElement('div');
+    div.id = id;
+    div.className = 'flex justify-start';
+    div.innerHTML = `
+        <div class="bg-gray-100 text-gray-400 rounded-2xl rounded-tl-none px-4 py-3">
+            <i class="fa-solid fa-ellipsis fa-fade"></i>
+        </div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return id;
+}
+
+function removeTypingIndicator(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
 }

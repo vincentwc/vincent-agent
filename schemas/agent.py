@@ -40,3 +40,13 @@ class AgentResponse(AgentBase):
         return dt.strftime("%Y-%m-%d %H:%M:%S")
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class AgentChatRequest(BaseModel):
+    query: str
+    stream: bool = False
+
+
+class AgentChatResponse(BaseModel):
+    answer: str
+    # sources: List[str] = []

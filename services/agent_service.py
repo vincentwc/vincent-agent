@@ -1,7 +1,11 @@
 from typing import List, Optional
 
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from database.db import db_manager
 from database.models import Agent
+from database.vector_store import VectoreStoreService
+from model.factory import chat_model_factory
 from utils.config_handler import config
 from utils.logger_handler import get_logger
 
@@ -54,6 +58,49 @@ class AgentService:
     def delete_agent(self, agent_id: str, tenant_id: str) -> bool:
         """删除智能体"""
         return db_manager.delete_agent(agent_id, tenant_id)
+
+    def chat(self, agent_id: str, query: str, tenant_id: str = "default_tenant") -> str:
+        """智能体对话"""
+        agent = self.get_agent(agent_id, tenant_id)
+        if not agent:
+            raise ValueError("Agent not found")
+
+        # 1. 检索上下文
+        context = ""
+        # 注意：这里假设 agent.knowledge_bases 已经被 eager loading 加载
+        kb_ids = [kb.id for kb in agent.knowledge_bases]
+
+        if kb_ids:
+            try:
+                vector_store = VectoreStoreService()
+                # Chroma filter syntax: {"field": {"$in": [values]}}
+                filter_rule = {"kb_id": {"$in": kb_ids}}
+
+                retriever = vector_store.get_retriever(k=3, filter=filter_rule)
+                docs = retriever.invoke(query)
+                if docs:
+                    context = "\n\n".join([doc.page_content for doc in docs])
+                    logger.info(f"Retrieved {len(docs)} documents for context.")
+            except Exception as e:
+                logger.error(f"检索知识库失败: {e}")
+
+        # 2. 构建提示词
+        base_prompt = agent.prompt or "You are a helpful assistant."
+        if context:
+            system_content = f"{base_prompt}\n\n基于以下上下文回答问题:\n{context}"
+        else:
+            system_content = base_prompt
+
+        messages = [SystemMessage(content=system_content), HumanMessage(content=query)]
+
+        # 3. 调用模型
+        try:
+            model = chat_model_factory.get_model()
+            response = model.invoke(messages)
+            return response.content
+        except Exception as e:
+            logger.error(f"模型调用失败: {e}")
+            raise
 
 
 agent_service = AgentService()
