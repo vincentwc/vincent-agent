@@ -6,9 +6,9 @@ from typing import List, Optional
 from fastapi import BackgroundTasks, HTTPException, UploadFile
 
 from core.codes import StatusCode
-from rag.db import db_manager
-from rag.models import KnowledgeBase, KnowledgeDocument
-from rag.vector_store import VectoreStoreService
+from database.db import db_manager
+from database.models import KnowledgeBase, KnowledgeDocument
+from database.vector_store import VectoreStoreService
 from utils.config_handler import config
 from utils.file_handler import get_file_md5_hex
 from utils.logger_handler import get_logger

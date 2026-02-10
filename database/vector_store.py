@@ -13,7 +13,7 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from model.factory import embedding_model_factory
-from rag.db import db_manager
+from database.db import db_manager
 from utils.config_handler import config
 from utils.file_handler import get_file_md5_hex, listdir_with_allowed_type, load_file
 from utils.logger_handler import get_logger

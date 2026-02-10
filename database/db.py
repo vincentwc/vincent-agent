@@ -1,9 +1,9 @@
 from typing import List, Optional
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, selectinload, sessionmaker
 
-from rag.models import Base, KnowledgeBase, KnowledgeDocument
+from database.models import Agent, Base, KnowledgeBase, KnowledgeDocument
 from utils.config_handler import config
 from utils.logger_handler import get_logger
 
@@ -292,10 +292,148 @@ class DBManager:
         finally:
             session.close()
 
+    # --- 智能体 (Agent) CRUD 操作 ---
+
+    def create_agent(
+        self,
+        name: str,
+        tenant_id: str,
+        description: str = None,
+        model_name: str = "gpt-3.5-turbo",
+        prompt: str = None,
+        kb_ids: List[str] = None,
+    ) -> Agent:
+        """创建智能体"""
+        session = self.get_session()
+        try:
+            agent = Agent(
+                name=name,
+                tenant_id=tenant_id,
+                description=description,
+                model_name=model_name,
+                prompt=prompt,
+            )
+
+            if kb_ids:
+                kbs = (
+                    session.query(KnowledgeBase)
+                    .filter(KnowledgeBase.id.in_(kb_ids))
+                    .all()
+                )
+                agent.knowledge_bases = kbs
+
+            session.add(agent)
+            session.commit()
+            session.refresh(agent)
+            # 确保在会话关闭前加载关联对象，防止 DetachedInstanceError
+            _ = agent.knowledge_bases
+            return agent
+        except Exception as e:
+            session.rollback()
+            logger.error(f"创建智能体失败: {e}")
+            raise
+        finally:
+            session.close()
+
+    def get_agent(self, agent_id: str, tenant_id: str) -> Optional[Agent]:
+        """获取智能体详情"""
+        session = self.get_session()
+        try:
+            return (
+                session.query(Agent)
+                .options(selectinload(Agent.knowledge_bases))
+                .filter(
+                    Agent.id == agent_id,
+                    Agent.tenant_id == tenant_id,
+                )
+                .first()
+            )
+        finally:
+            session.close()
+
+    def list_agents(
+        self, tenant_id: str, limit: int = 100, offset: int = 0
+    ) -> List[Agent]:
+        """获取智能体列表"""
+        session = self.get_session()
+        try:
+            return (
+                session.query(Agent)
+                .options(selectinload(Agent.knowledge_bases))
+                .filter(Agent.tenant_id == tenant_id)
+                .order_by(Agent.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+                .all()
+            )
+        finally:
+            session.close()
+
+    def update_agent(self, agent_id: str, tenant_id: str, **kwargs) -> Optional[Agent]:
+        """更新智能体"""
+        session = self.get_session()
+        try:
+            agent = (
+                session.query(Agent)
+                .filter(
+                    Agent.id == agent_id,
+                    Agent.tenant_id == tenant_id,
+                )
+                .first()
+            )
+            if not agent:
+                return None
+
+            kb_ids = kwargs.pop("kb_ids", None)
+            if kb_ids is not None:
+                kbs = (
+                    session.query(KnowledgeBase)
+                    .filter(KnowledgeBase.id.in_(kb_ids))
+                    .all()
+                )
+                agent.knowledge_bases = kbs
+
+            for key, value in kwargs.items():
+                if hasattr(agent, key):
+                    setattr(agent, key, value)
+
+            session.commit()
+            session.refresh(agent)
+            # 确保在会话关闭前加载关联对象，防止 DetachedInstanceError
+            _ = agent.knowledge_bases
+            return agent
+        except Exception as e:
+            session.rollback()
+            logger.error(f"更新智能体失败: {e}")
+            raise
+        finally:
+            session.close()
+
+    def delete_agent(self, agent_id: str, tenant_id: str) -> bool:
+        """删除智能体"""
+        session = self.get_session()
+        try:
+            agent = (
+                session.query(Agent)
+                .filter(
+                    Agent.id == agent_id,
+                    Agent.tenant_id == tenant_id,
+                )
+                .first()
+            )
+            if not agent:
+                return False
+
+            session.delete(agent)
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            logger.error(f"删除智能体失败: {e}")
+            raise
+        finally:
+            session.close()
+
 
 # 全局数据库实例
 db_manager = DBManager()
-
-
-# if __name__ == "__main__":
-#     db_manager._init_engine()

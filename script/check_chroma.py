@@ -6,8 +6,8 @@ from collections import defaultdict
 
 import chromadb
 
-from rag.db import db_manager
-from rag.models import KnowledgeDocument
+from database.db import db_manager
+from database.models import KnowledgeDocument
 from utils.config_handler import config
 from utils.logger_handler import get_logger
 

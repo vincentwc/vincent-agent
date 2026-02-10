@@ -1,13 +1,10 @@
 import os
-import shutil
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from api.routes import index, knowledge_base
+from api.routes import agent, index, knowledge_base
 from core.exception import register_exception_handlers
-from utils.config_handler import config
 from utils.logger_handler import get_logger
 from utils.path_tool import get_abs_path
 
@@ -18,8 +15,9 @@ app = FastAPI(title="Vincent Agent API")
 # Register Global Exception Handlers
 register_exception_handlers(app)
 
-# Include Routers
+# Include Routers 各模块对应的uri前缀
 app.include_router(knowledge_base.router, prefix="/kb", tags=["Knowledge Base"])
+app.include_router(agent.router, prefix="/agent", tags=["Agent"])
 app.include_router(index.router, tags=["Web"])
 
 # 挂载静态文件目录，用于访问 css/js 等资源（如果将来有的话）
