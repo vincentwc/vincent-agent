@@ -22,7 +22,7 @@ class StatusCode(int, Enum):
     NOT_FOUND = (404, "资源未找到")
     METHOD_NOT_ALLOWED = (405, "请求方法不允许")
     VALIDATION_ERROR = (422, "参数校验失败")
-    SERVER_ERROR = (500, "系统内部错误")
+    INTERNAL_SERVER_ERROR = (500, "系统内部错误")
 
     # 业务错误码 (5000-5999)
     DB_ERROR = (5001, "数据库操作异常")

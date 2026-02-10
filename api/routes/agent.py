@@ -12,6 +12,9 @@ from schemas.agent import (
     AgentUpdateRequest,
 )
 from services.agent_service import agent_service
+from utils.logger_handler import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -84,6 +87,7 @@ async def chat_agent(
     except ValueError as e:
         raise HTTPException(status_code=StatusCode.NOT_FOUND, detail=str(e))
     except Exception as e:
+        logger.error(f"对话处理异常: {e}")
         raise HTTPException(
             status_code=StatusCode.INTERNAL_SERVER_ERROR, detail=f"对话失败: {str(e)}"
         )

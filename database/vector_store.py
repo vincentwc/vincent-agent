@@ -12,8 +12,8 @@ from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from model.factory import embedding_model_factory
 from database.db import db_manager
+from model.factory import embedding_model_factory
 from utils.config_handler import config
 from utils.file_handler import get_file_md5_hex, listdir_with_allowed_type, load_file
 from utils.logger_handler import get_logger
@@ -199,6 +199,7 @@ class VectoreStoreService:
         Returns:
             VectorStoreRetriever: LangChain 检索器实例。
         """
+        logger.info(f"创建检索器，参数: k={k}, kwargs={kwargs}")
         search_kwargs = {"k": k or config.chroma.get("k", 5)}  # 默认返回5个文档
         search_kwargs.update(kwargs)  # 合并其他参数
 
@@ -264,6 +265,13 @@ class VectoreStoreService:
             logger.exception(f"处理文件出错 {file_path}: {e}")
 
 
-if __name__ == "__main__":
-    vector_store_service = VectoreStoreService()
-    vector_store_service.load_documents()
+# if __name__ == "__main__":
+#     vector_store = VectoreStoreService()
+#     # Chroma filter syntax: {"field": {"$in": [values]}}
+#     filter_rule = {"kb_id": {'$in': ['775786d0-0960-4604-947a-def544c25d83']}}
+
+#     retriever = vector_store.get_retriever(k=3, filter=filter_rule)
+
+#     result = retriever.invoke("缠绕")
+
+#     print(result)

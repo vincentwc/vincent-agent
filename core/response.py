@@ -21,7 +21,7 @@ class BaseResponse(BaseModel, Generic[T]):
     @classmethod
     def error(
         cls,
-        code: int = StatusCode.SERVER_ERROR,
+        code: int = StatusCode.INTERNAL_SERVER_ERROR,
         message: str = None,
         data: Any = None,
     ):
