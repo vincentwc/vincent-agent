@@ -15,5 +15,8 @@ pip install -r requirements.txt
 - [x] 支持页面上传知识库文档
 - [x] 知识库的增删改查
 
+## 项目文档
+
+- [系统架构文档](docs/ARCHITECTURE.md)
 
 

@@ -51,6 +51,67 @@ graph TD
     class Web,API,Service,VS layer;
 ```
 
+## 数据模型设计 (ERD)
+
+```mermaid
+erDiagram
+    KNOWLEDGE_BASE ||--o{ KNOWLEDGE_DOCUMENT : contains
+    KNOWLEDGE_BASE {
+        string id PK "UUID"
+        string name "知识库名称"
+        string tenant_id "租户ID"
+        string collection_name "Chroma集合名称"
+        string description
+        json meta_info
+        datetime created_at
+        datetime updated_at
+    }
+    KNOWLEDGE_DOCUMENT {
+        string id PK "UUID"
+        string kb_id FK "关联知识库ID"
+        string filename
+        string extension
+        string mime_type
+        int size
+        string md5 "文件指纹"
+        string status "pending/running/completed/failed"
+        string error_msg
+        string stored_path "本地存储路径"
+        datetime created_at
+        datetime updated_at
+    }
+```
+
+## 组件交互设计
+
+```mermaid
+classDiagram
+    class KnowledgeBaseService {
+        +create_knowledge_base()
+        +upload_document()
+        +list_knowledge_bases()
+        +get_knowledge_base()
+    }
+    class DBManager {
+        +create_document()
+        +check_document_exists()
+        +get_document_by_id()
+    }
+    class VectorStoreService {
+        +add_document()
+        +search()
+        -_load_and_split()
+    }
+    class BackgroundTasks {
+        +add_task()
+    }
+    
+    KnowledgeBaseService --> DBManager : 读写元数据
+    KnowledgeBaseService ..> BackgroundTasks : 调度异步任务
+    BackgroundTasks ..> VectorStoreService : 触发向量化
+    VectorStoreService --> DBManager : 更新任务状态
+```
+
 项目遵循领域驱动设计 (DDD) 的分层原则：
 
 1.  **用户接口层 (User Interface)**
