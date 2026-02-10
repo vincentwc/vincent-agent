@@ -188,6 +188,49 @@ class VectoreStoreService:
         except Exception as e:
             logger.error(f"删除知识库向量失败: {e}")
 
+    def search(
+        self,
+        query: str,
+        k: int = 3,
+        score_threshold: float = 0.3,
+        filter: Optional[dict] = None,
+    ) -> List[Document]:
+        """
+        执行相似度搜索并进行阈值过滤（显式后置过滤模式）。
+
+        Args:
+            query (str): 查询语句。
+            k (int): 召回数量。
+            score_threshold (float): 相似度阈值（0-1）。
+            filter (dict): 过滤条件。
+
+        Returns:
+            List[Document]: 过滤后的文档列表。
+        """
+        # 1. 执行相似度搜索，获取带分数的原始结果
+        # Chroma 返回的是距离 (L2 distance)，越小越相似
+        docs_and_scores = self.vector_store.similarity_search_with_score(
+            query, k=k, filter=filter
+        )
+
+        # 2. 后置过滤
+        results = []
+        for doc, score in docs_and_scores:
+            # 将 L2 距离转换为 0-1 相似度分数
+            # 距离 0 -> 分数 1.0; 距离 1 -> 分数 0.5
+            similarity = 1.0 / (1.0 + score)
+
+            if similarity >= score_threshold:
+                # 将计算出的相似度分数注入 metadata，方便后续查看
+                doc.metadata["score"] = similarity
+                results.append(doc)
+
+        logger.info(
+            f"搜索完成: query='{query}', k={k}, threshold={score_threshold}, "
+            f"召回={len(docs_and_scores)}, 过滤后={len(results)}"
+        )
+        return results
+
     def get_retriever(
         self,
         k: Optional[int] = None,
