@@ -24,6 +24,57 @@
 └── requirements.txt    # 项目依赖
 ```
 
+## 系统上下文与容器架构 (C4 Model)
+
+此图展示了 Vincent Agent 系统的整体容器架构及其与外部系统的交互。
+
+```mermaid
+graph TB
+    %% Users
+    User[["👤 用户 (User)<br><small>知识库管理员/普通用户</small>"]]
+
+    %% System Boundary
+    subgraph "Vincent Agent System"
+        direction TB
+        WebApp["🖥️ Web 前端<br><small>HTML/JS/Tailwind</small>"]
+        APIApp["⚙️ 后端 API 服务<br><small>FastAPI/Python</small>"]
+        
+        subgraph "数据存储"
+            DB[("🗄️ 关系型数据库<br><small>PostgreSQL</small>")]
+            VectorDB[("🧬 向量数据库<br><small>ChromaDB</small>")]
+            FileSys[("📂 文件存储<br><small>Local Filesystem</small>")]
+        end
+    end
+
+    %% External Systems
+    subgraph "外部依赖服务"
+        LLMProvider["🤖 大模型服务 (LLM)<br><small>Qwen3-Max (DashScope)</small>"]
+        EmbedProvider["🔤 Embedding 服务<br><small>Text-Embedding-V4</small>"]
+    end
+
+    %% Relationships
+    User -->|交互/上传文档| WebApp
+    WebApp -->|"REST API (JSON)"| APIApp
+    
+    APIApp -->|读写元数据| DB
+    APIApp -->|语义检索/存储| VectorDB
+    APIApp -->|文件读写| FileSys
+    
+    APIApp -->|对话生成| LLMProvider
+    APIApp -->|文本向量化| EmbedProvider
+
+    %% Styling
+    classDef person fill:#08427b,stroke:#052e56,color:#fff;
+    classDef container fill:#1168bd,stroke:#0b4884,color:#fff;
+    classDef db fill:#2f95d6,stroke:#2071a5,color:#fff;
+    classDef ext fill:#999999,stroke:#666666,color:#fff;
+    
+    class User person;
+    class WebApp,APIApp container;
+    class DB,VectorDB,FileSys db;
+    class LLMProvider,EmbedProvider ext;
+```
+
 ## 核心架构设计 (DDD 分层)
 
 ```mermaid

@@ -1,0 +1,59 @@
+项目名称: vincent-agent
+
+## 系统架构分析 (Python/FastAPI)
+
+这是一个基于 FastAPI 的 Python 项目，包含以下层次结构：
+
+### 1. 接口层 (API Layer)
+- server (server.py): 无显式路由
+- knowledge_base (api/routes/knowledge_base.py): GET /config, POST /create, GET /list, GET /{kb_id}, PUT /{kb_id}
+- index (api/routes/index.py): GET /
+
+### 2. 业务服务层 (Service Layer)
+- knowledge_base_service: KnowledgeBaseService
+
+### 3. 数据基础设施层 (Infrastructure Layer)
+- db: DBManager
+- vector_store: MD5Manager, VectoreStoreService
+
+### 4. 数据模型 (Data Models)
+- models: Base, KnowledgeBase, KnowledgeDocument
+- knowledge_base: KBBase, KBCreateRequest, KBUpdateRequest, KBResponse, DocumentResponse
+- factory: BaseModelFactory, ChatModelFactory, EmbeddingModelFactory
+
+### 5. 组件依赖关系
+- knowledge_base_service ⤳ db
+- knowledge_base_service ⤳ vector_store
+- knowledge_base → knowledge_base_service
+- db ⤳ db
+- vector_store ⤳ db
+- vector_store ⤳ vector_store
+
+## 绘图要求
+
+请生成一张专业的系统架构图，要求：
+
+1. **分层布局**：
+   - 顶部：API 路由/接口层（橙色）
+   - 中部：业务服务层（蓝色）
+   - 底部：基础设施/数据层（绿色）
+   - 最底部：外部系统/数据库（深灰色）
+
+2. **组件样式**：
+   - Router/Controller: 矩形，橙色边框
+   - Service: 矩形，蓝色填充
+   - Repository/DB Manager: 矩形，浅绿色填充
+   - Schema/Model: 圆角矩形，灰色填充
+
+3. **连接线**：
+   - 服务调用：实线箭头
+   - 数据读写：虚线箭头
+   - 标注调用方向
+
+4. **文字标注**：
+   - 显示模块名或类名
+   - 关键 API 路径可作为子标签
+
+5. **整体风格**：
+   - 简洁、现代
+   - 使用 C4 模型或类似的分层架构风格

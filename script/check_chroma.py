@@ -1,3 +1,6 @@
+"""
+分析数据库中的文档是否与 ChromaDB 中的向量数据一致
+"""
 import os
 from collections import defaultdict
 
