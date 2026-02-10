@@ -26,6 +26,31 @@
 
 ## 核心架构设计 (DDD 分层)
 
+```mermaid
+graph TD
+    User["用户 (User)"] -->|HTTP/Interaction| Web["前端 (Frontend)"]
+    Web -->|REST API| API["接口层 (API Layer)"]
+    
+    subgraph "Backend Application (DDD)"
+        API -->|Delegates| Service["应用服务层 (Service Layer)"]
+        
+        subgraph "Infrastructure / Repository"
+            Service -->|CRUD| DB[("PostgreSQL")]
+            Service -->|I/O| FS["文件系统 (File Storage)"]
+            Service -->|Dispatch| BG["后台任务 (Background Tasks)"]
+        end
+        
+        subgraph "RAG Engine (Domain)"
+            BG -->|Invoke| VS["向量服务 (Vector Store Service)"]
+            VS -->|Generate| Embed["Embedding Model"]
+            VS -->|Store/Query| Chroma[("ChromaDB")]
+        end
+    end
+
+    classDef layer fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    class Web,API,Service,VS layer;
+```
+
 项目遵循领域驱动设计 (DDD) 的分层原则：
 
 1.  **用户接口层 (User Interface)**
@@ -52,6 +77,58 @@
 ## 关键业务流程
 
 ### 1. 文档上传与向量化流程
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant FE as 前端 (UI)
+    participant API as API Layer
+    participant S as Service Layer
+    participant DB as 数据库 (DB)
+    participant BG as 后台任务 (Task)
+    participant VS as 向量服务 (RAG)
+
+    U->>FE: 拖拽上传文件
+    FE->>FE: 校验格式/大小
+    FE->>API: POST /upload
+    API->>S: upload_document()
+    S->>S: 计算 MD5
+    S->>DB: 查重 (check_md5)
+    
+    alt 文件已存在
+        S-->>API: 抛出异常 (FileExists)
+        API-->>FE: 错误提示
+    else 文件新上传
+        S->>S: 保存文件到磁盘
+        S->>DB: 创建记录 (status=pending)
+        S->>BG: 添加任务 (do_vectorize)
+        S-->>API: 返回成功
+        API-->>FE: 显示"已上传", 开启轮询
+        
+        par 异步处理与状态同步
+            rect rgb(240, 248, 255)
+                Note right of BG: 异步向量化流程
+                BG->>VS: 触发向量化
+                VS->>DB: 更新状态 (running)
+                VS->>VS: Load -> Split -> Embed
+                VS->>VS: 存入 ChromaDB
+                alt 成功
+                    VS->>DB: 更新状态 (completed)
+                else 失败
+                    VS->>DB: 更新状态 (failed)
+                end
+            end
+        and 前端轮询
+            loop 每3秒
+                FE->>API: GET /documents
+                API->>DB: 查询最新状态
+                DB-->>FE: 返回文档列表
+                FE->>FE: 更新 UI 状态徽章
+            end
+        end
+    end
+```
+
 1.  **上传**: 用户通过前端拖拽上传文件。
 2.  **校验**:
     *   前端校验文件类型 (`.pdf`, `.txt`, `.md`) 和大小。
