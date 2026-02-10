@@ -1,19 +1,24 @@
-from typing import Optional
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, field_serializer
+
 
 class KBBase(BaseModel):
     name: str
     description: Optional[str] = None
     meta_info: Optional[dict] = {}
 
+
 class KBCreateRequest(KBBase):
     tenant_id: str = "default_tenant"  # 商业化租户ID
+
 
 class KBUpdateRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     meta_info: Optional[dict] = None
+
 
 class KBResponse(KBBase):
     id: str
@@ -22,7 +27,12 @@ class KBResponse(KBBase):
     created_at: datetime
     updated_at: datetime
 
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+
     model_config = ConfigDict(from_attributes=True)
+
 
 class DocumentResponse(BaseModel):
     id: str
@@ -31,7 +41,14 @@ class DocumentResponse(BaseModel):
     extension: str
     mime_type: Optional[str] = None
     size: int
+    status: str = "pending"
+    error_msg: Optional[str] = None
     stored_path: str
     created_at: datetime
     updated_at: datetime
+
+    @field_serializer("created_at", "updated_at")
+    def serialize_dt(self, dt: datetime, _info):
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+
     model_config = ConfigDict(from_attributes=True)

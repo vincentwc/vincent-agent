@@ -1,7 +1,7 @@
 import os
 from typing import List
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from core.codes import StatusCode
@@ -57,7 +57,7 @@ async def get_knowledge_base(kb_id: str, tenant_id: str = "default_tenant"):
     """
     kb = kb_service.get_knowledge_base(kb_id, tenant_id)
     if not kb:
-        raise HTTPException(status_code=StatusCode.NOT_FOUND, detail="知识库不存在")    
+        raise HTTPException(status_code=StatusCode.NOT_FOUND, detail="知识库不存在")
     return BaseResponse.success(KBResponse.model_validate(kb))
 
 
@@ -96,11 +96,13 @@ async def delete_knowledge_base(kb_id: str, tenant_id: str = "default_tenant"):
 
 
 @router.post("/{kb_id}/documents/upload", response_model=BaseResponse[DocumentResponse])
-async def upload_document(kb_id: str, file: UploadFile = File(...)):
+async def upload_document(
+    kb_id: str, background_tasks: BackgroundTasks, file: UploadFile = File(...)
+):
     """
     上传文档到知识库
     """
-    doc = kb_service.upload_document(kb_id, file)
+    doc = kb_service.upload_document(kb_id, file, background_tasks)
     return BaseResponse.success(DocumentResponse.model_validate(doc))
 
 

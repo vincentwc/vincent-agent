@@ -3,16 +3,19 @@ import shutil
 import uuid
 from typing import List, Optional
 
-from fastapi import HTTPException, UploadFile
+from fastapi import BackgroundTasks, HTTPException, UploadFile
 
 from core.codes import StatusCode
 from rag.db import db_manager
 from rag.models import KnowledgeBase, KnowledgeDocument
+from rag.vector_store import VectoreStoreService
 from utils.config_handler import config
+from utils.file_handler import get_file_md5_hex
 from utils.logger_handler import get_logger
 from utils.path_tool import get_abs_path
 
 logger = get_logger(__name__)
+vector_store = VectoreStoreService()
 
 
 class KnowledgeBaseService:
@@ -94,8 +97,8 @@ class KnowledgeBaseService:
             success = db_manager.delete_knowledge_base(kb_id=kb_id, tenant_id=tenant_id)
 
             if success:
-                # TODO: 在此处调用 Chroma 删除对应的 Collection
-                # collection_name = kb.collection_name
+                # 调用 Chroma 删除对应的 Collection 数据 (通过 metadata 过滤)
+                vector_store.delete_knowledge_base(kb_id)
                 logger.info(f"删除知识库成功: {kb.name} (ID: {kb_id})")
 
             return success
@@ -105,7 +108,9 @@ class KnowledgeBaseService:
 
     # --- Document Management ---
 
-    def upload_document(self, kb_id: str, file: UploadFile) -> KnowledgeDocument:
+    def upload_document(
+        self, kb_id: str, file: UploadFile, background_tasks: BackgroundTasks = None
+    ) -> KnowledgeDocument:
         """
         上传文档到知识库
         """
@@ -137,12 +142,22 @@ class KnowledgeBaseService:
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
 
-            # 3. 获取文件信息
+            # 3. 计算 MD5 并查重
+            md5 = get_file_md5_hex(file_path)
+            if md5 and db_manager.check_document_exists(kb_id, md5):
+                # 如果已存在，删除刚上传的文件并抛出异常
+                os.remove(file_path)
+                raise HTTPException(
+                    status_code=StatusCode.BAD_REQUEST,
+                    detail=f"文档 {file.filename} 已存在，请勿重复上传",
+                )
+
+            # 4. 获取文件信息
             size = os.path.getsize(file_path)
             extension = os.path.splitext(file.filename)[1].lower()
             mime_type = file.content_type
 
-            # 4. 写入数据库
+            # 5. 写入数据库
             doc = db_manager.create_document(
                 kb_id=kb_id,
                 filename=file.filename,
@@ -150,7 +165,23 @@ class KnowledgeBaseService:
                 size=size,
                 extension=extension,
                 mime_type=mime_type,
+                md5=md5,
             )
+
+            # 6. 触发向量化任务
+            if background_tasks:
+                background_tasks.add_task(
+                    vector_store.add_document,  # <--- 要执行的函数 (不要加括号调用)
+                    kb_id=kb_id,  # <--- 参数 1
+                    doc_id=doc.id,  # <--- 参数 2
+                    file_path=file_path,  # <--- 参数 3
+                )
+            else:
+                # 如果没有提供 background_tasks，则同步执行 (可能会阻塞)
+                logger.warning("未提供 BackgroundTasks，正在同步执行向量化...")
+                vector_store.add_document(
+                    kb_id=kb_id, doc_id=doc.id, file_path=file_path
+                )
 
             logger.info(f"文档上传成功: {file.filename} 到知识库: {kb_id}")
             return doc
@@ -199,7 +230,11 @@ class KnowledgeBaseService:
                     logger.warning(f"删除文件失败 {doc.stored_path}: {e}")
 
             # 3. 删除数据库记录
-            return db_manager.delete_document(kb_id=kb_id, doc_id=doc_id)
+            if db_manager.delete_document(kb_id=kb_id, doc_id=doc_id):
+                # 4. 删除向量库记录
+                vector_store.delete_document(kb_id=kb_id, doc_id=doc_id)
+                return True
+            return False
         except Exception as e:
             logger.error(f"删除文档失败: {e}")
             raise

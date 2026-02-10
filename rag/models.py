@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, DateTime, String, Text, Integer, ForeignKey
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -57,6 +57,17 @@ class KnowledgeDocument(Base):
     extension: Mapped[str] = mapped_column(String(20), nullable=False)
     mime_type: Mapped[str] = mapped_column(String(100), nullable=True)
     size: Mapped[int] = mapped_column(Integer, nullable=False)
+    md5: Mapped[Optional[str]] = mapped_column(
+        String(32), nullable=True, comment="文件MD5"
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="pending",
+        comment="向量化状态: pending/running/completed/failed",
+    )
+    error_msg: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="错误信息"
+    )
     stored_path: Mapped[str] = mapped_column(String(500), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

@@ -105,7 +105,9 @@ class FileLoaderFactory:
             return PyPDFLoader(file_path, password=kwargs.get("passwd"))
         elif ext == ".txt":
             return TextLoader(file_path, encoding=kwargs.get("encoding", "utf-8"))
-        # 可以在这里扩展更多类型，如 .md, .csv 等
+        elif ext == ".md":
+            return TextLoader(file_path, encoding=kwargs.get("encoding", "utf-8"))
+        # 可以在这里扩展更多类型，如 .csv 等
         else:
             logger.warning(f"不支持的文件类型: {ext}")
             return None

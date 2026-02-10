@@ -13,6 +13,7 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from model.factory import embedding_model_factory
+from rag.db import db_manager
 from utils.config_handler import config
 from utils.file_handler import get_file_md5_hex, listdir_with_allowed_type, load_file
 from utils.logger_handler import get_logger
@@ -116,6 +117,76 @@ class VectoreStoreService:
             config.chroma.get("md5_hex_store", "md5_store.txt")
         )
         self._initialized = True
+
+    def add_document(self, kb_id: str, doc_id: str, file_path: str):
+        """
+        添加单个文档到向量库
+
+        Args:
+            kb_id: 知识库ID
+            doc_id: 文档ID
+            file_path: 文件绝对路径
+        """
+        try:
+            # 0. 更新状态为 running
+            db_manager.update_document_status(kb_id, doc_id, "running")
+
+            # 1. 加载文件
+            documents: List[Document] = load_file(file_path)
+            if not documents:
+                logger.warning(f"文件为空 or 加载失败: {file_path}")
+                db_manager.update_document_status(
+                    kb_id, doc_id, "failed", "文件加载失败或内容为空"
+                )
+                return
+
+            # 2. 注入 Metadata
+            for doc in documents:
+                doc.metadata["kb_id"] = kb_id
+                doc.metadata["doc_id"] = doc_id
+                doc.metadata["source"] = file_path
+
+            # 3. 分块
+            split_docs: List[Document] = self.splitter.split_documents(documents)
+            if not split_docs:
+                logger.warning(f"分块结果为空: {file_path}")
+                db_manager.update_document_status(
+                    kb_id, doc_id, "failed", "文档分块结果为空"
+                )
+                return
+
+            # 4. 存入 Chroma
+            self.vector_store.add_documents(split_docs)
+
+            # 5. 更新状态为 completed
+            db_manager.update_document_status(kb_id, doc_id, "completed")
+            logger.info(
+                f"文档已向量化: kb_id={kb_id}, doc_id={doc_id}, path={file_path}"
+            )
+
+        except Exception as e:
+            logger.exception(f"向量化失败: {file_path}, error: {e}")
+            db_manager.update_document_status(kb_id, doc_id, "failed", str(e))
+
+    def delete_document(self, kb_id: str, doc_id: str):
+        """删除指定文档的向量"""
+        try:
+            # Chroma 的 delete 方法通常支持 where 过滤
+            # 确保 collection 存在
+            self.vector_store._collection.delete(
+                where={"$and": [{"kb_id": kb_id}, {"doc_id": doc_id}]}
+            )
+            logger.info(f"文档向量已删除: kb_id={kb_id}, doc_id={doc_id}")
+        except Exception as e:
+            logger.error(f"删除文档向量失败: {e}")
+
+    def delete_knowledge_base(self, kb_id: str):
+        """删除整个知识库的向量"""
+        try:
+            self.vector_store._collection.delete(where={"kb_id": kb_id})
+            logger.info(f"知识库向量已删除: kb_id={kb_id}")
+        except Exception as e:
+            logger.error(f"删除知识库向量失败: {e}")
 
     def get_retriever(self, k: Optional[int] = None, **kwargs) -> VectorStoreRetriever:
         """

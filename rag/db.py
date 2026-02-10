@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, scoped_session, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from rag.models import Base, KnowledgeBase, KnowledgeDocument
 from utils.config_handler import config
@@ -179,6 +179,7 @@ class DBManager:
         size: int,
         extension: str,
         mime_type: str = None,
+        md5: str = None,
     ) -> KnowledgeDocument:
         session = self.get_session()
         try:
@@ -189,6 +190,7 @@ class DBManager:
                 size=size,
                 extension=extension,
                 mime_type=mime_type,
+                md5=md5,
             )
             session.add(doc)
             session.commit()
@@ -198,6 +200,19 @@ class DBManager:
             session.rollback()
             logger.error(f"创建文档失败: {e}")
             raise
+        finally:
+            session.close()
+
+    def check_document_exists(self, kb_id: str, md5: str) -> bool:
+        """检查知识库中是否存在相同MD5的文档"""
+        session = self.get_session()
+        try:
+            return (
+                session.query(KnowledgeDocument)
+                .filter(KnowledgeDocument.kb_id == kb_id, KnowledgeDocument.md5 == md5)
+                .first()
+                is not None
+            )
         finally:
             session.close()
 
@@ -223,6 +238,35 @@ class DBManager:
                 )
                 .first()
             )
+        finally:
+            session.close()
+
+    def update_document_status(
+        self, kb_id: str, doc_id: str, status: str, error_msg: str = None
+    ) -> bool:
+        """更新文档状态"""
+        session = self.get_session()
+        try:
+            doc = (
+                session.query(KnowledgeDocument)
+                .filter(
+                    KnowledgeDocument.id == doc_id, KnowledgeDocument.kb_id == kb_id
+                )
+                .first()
+            )
+            if not doc:
+                return False
+
+            doc.status = status
+            if error_msg:
+                doc.error_msg = error_msg
+
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            logger.error(f"更新文档状态失败: {e}")
+            return False
         finally:
             session.close()
 
